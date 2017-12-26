@@ -1,5 +1,6 @@
 import argparse
 import yaml
+import itertools
 
 from eliot import Message, add_destination
 
@@ -67,7 +68,7 @@ def from_content(content, log=None):
         raise ExploException('no exploitation content')
 
     try:
-        blocks = load_blocks(content)
+        info, blocks = load_blocks(content)
     except yaml.YAMLError as err:
         raise ExploException('error parsing document: %s' % err)
 
@@ -78,11 +79,15 @@ def from_content(content, log=None):
     if log:
         add_destination(log)
 
-    return process_blocks(blocks)
+    return info, process_blocks(blocks)
 
 def load_blocks(content):
     """ Load documents/blocks from a YAML file """
-    return [b for b in yaml.safe_load_all(content)]
+    exploit = yaml.safe_load_all(content)
+    info = next(itertools.islice(exploit, 1))
+    steps = list(exploit)
+
+    return info, steps
 
 def validate_blocks(blocks):
     """ Ensures minimal fields are set for passed block """
@@ -142,3 +147,13 @@ def log_stdout(message):
         level_msg = color.yellow('Warning: ') if level == 'warning' else ''
 
         print("{}{}".format(level_msg, message['message']))
+
+
+def process_info(block):
+    hostname = block.get('hostname', 'undefined')
+    description = block.get('description', 'not specified')
+    cvss = block.get('cvss', 0)
+
+    Message.log(level='status',
+                message="Description: {}\nHostname affected: {}\nCVSS: {}".format(hostname, description, cvss))
+    return block
